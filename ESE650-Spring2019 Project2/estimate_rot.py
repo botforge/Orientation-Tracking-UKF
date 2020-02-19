@@ -78,13 +78,25 @@ def process_imu(imu_raw):
 	sens_accel = 330
 	scale_accel = 3300/1023/sens_accel #IMU Ref sheet
 	accel = accel * scale_accel
-	bias_accel = np.mean(accel[0:50], axis=0) - zero_g 
+	bias_accel = np.mean(accel[0:10], axis=0) - zero_g 
 	accel = (accel - bias_accel)
+
+	#b) Gyroscope
+	sens_gyro = 3.33
+	scale_gyro = 3300/1023/sens_gyro
+	gyro = gyro * scale_gyro
+	bias_gyro = np.mean(gyro[0:10], axis=0)
+	gyro = (gyro - bias_gyro) * (math.pi/180.0)
+	pdb.set_trace()
 
 	#3) Convert [Rx, Ry, Rz] into roll, pitch, yaw (roll & pitch from accel are swapped?)
 	#a) Accelerometer
 	accel_pitch = np.arctan2(-accel[:, 0], accel[:, 2])
 	accel_roll = np.arctan2(accel[:, 1], (np.sqrt(np.square(accel[:, 0]) + np.square(accel[:, 2]))))
+
+	#b) Gyroscope
+	gyro_yaw = gyro
+	plt.plot(np.squeeze(ts), gyro[:, 0], label="gyrosmthn")
 
 def estimate_rot(data_num=1):
 	imu_raw, vicon_raw = load_data(data_num)
