@@ -52,7 +52,7 @@ def process_imu(imu_raw):
 	"""
 	vals = imu_raw.get("vals")
 	ts = imu_raw.get("ts")
-	zero_g = np.array([0, 0, -9.8])
+	zero_g = np.array([0, 0, +1])
 
 	#1) Extract accel and gyro from measurements & transform
 	#a) Transform Accel according to note@183
@@ -81,10 +81,10 @@ def process_imu(imu_raw):
 	bias_accel = np.mean(accel[0:50], axis=0) - zero_g 
 	accel = (accel - bias_accel)
 
-	#3) Convert [Rx, Ry, Rz] into roll, pitch, yaw
+	#3) Convert [Rx, Ry, Rz] into roll, pitch, yaw (roll & pitch from accel are swapped?)
 	#a) Accelerometer
-	pdb.set_trace()
-	# plt.plot(np.squeeze(ts), readings, label="accel_smthn")
+	accel_pitch = np.arctan2(-accel[:, 0], accel[:, 2])
+	accel_roll = np.arctan2(accel[:, 1], (np.sqrt(np.square(accel[:, 0]) + np.square(accel[:, 2]))))
 
 def estimate_rot(data_num=1):
 	imu_raw, vicon_raw = load_data(data_num)
