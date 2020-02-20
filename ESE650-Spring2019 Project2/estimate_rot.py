@@ -4,6 +4,7 @@ import math
 import matplotlib.pyplot as plt
 import pdb
 import os
+import cumquat
 
 def load_data(data_num):
 	"""
@@ -45,13 +46,13 @@ def plot_vicon(vicon_raw):
 	ts = vicon_raw.get("ts")
 	plt.plot(np.squeeze(ts), rolls, label="roll")
 	plt.plot(np.squeeze(ts), pitches, label="pitch")
-	plt.plot(np.squeeze(ts), yaws, label="yaw")
+	# plt.plot(np.squeeze(ts), yaws, label="yaw")
 
 def process_imu(imu_raw):
 	"""
 	"""
 	vals = imu_raw.get("vals")
-	ts = imu_raw.get("ts")
+	ts = np.squeeze(imu_raw.get("ts"))
 	zero_g = np.array([0, 0, +1])
 
 	#1) Extract accel and gyro from measurements & transform
@@ -87,16 +88,30 @@ def process_imu(imu_raw):
 	gyro = gyro * scale_gyro
 	bias_gyro = np.mean(gyro[0:10], axis=0)
 	gyro = (gyro - bias_gyro) * (math.pi/180.0)
-	pdb.set_trace()
 
-	#3) Convert [Rx, Ry, Rz] into roll, pitch, yaw (roll & pitch from accel are swapped?)
+	#3) Convert [Rx, Ry, Rz] into roll, pitch, yaw (roll & pitch from accel are swapped w.r.t vicon)
 	#a) Accelerometer
 	accel_pitch = np.arctan2(-accel[:, 0], accel[:, 2])
 	accel_roll = np.arctan2(accel[:, 1], (np.sqrt(np.square(accel[:, 0]) + np.square(accel[:, 2]))))
+	plt.plot(ts, accel_pitch, label="accel_pitch")
+	plt.plot(ts, accel_roll, label="accel_roll")
 
 	#b) Gyroscope
-	gyro_yaw = gyro
-	plt.plot(np.squeeze(ts), gyro[:, 0], label="gyrosmthn")
+	omega = gyro
+
+	#i) Find delta_t array 
+	delta_t = np.zeros_like(ts)
+	delta_t[:-1] = ts[1:] - ts[0:-1]
+
+	#ii) Calculate angle and axis
+	omega_mag = np.linalg.norm(omega, axis=1)
+	delta_angle = omega_mag * delta_t
+	delta_e = np.zeros_like(omega)
+	delta_e[:, 0] = 0
+
+	pdb.set_trace()
+
+	# # plt.plot(np.squeeze(ts), gyro[:, 0], label="gyrosmthn")
 
 def estimate_rot(data_num=1):
 	imu_raw, vicon_raw = load_data(data_num)
@@ -106,4 +121,5 @@ def estimate_rot(data_num=1):
 	plt.legend()
 	plt.show()
 
-estimate_rot()
+data_num=1
+estimate_rot(data_num)
