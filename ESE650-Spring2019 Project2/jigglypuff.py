@@ -1,12 +1,13 @@
 import numpy as np
 from cumquat import *
+import pdb
 import math
 
 class UKF:
     def __init__(self):
-        self.x = np.zeros((7,))
-        self.P = np.zeros((6, 6))
-        self.Q = np.zeros((6, 6))
+        self.x = np.array([1.0, 0, 0, 0, 1, 1, 1], dtype=np.float64)
+        self.P = np.identity(6)
+        self.Q = np.identity(6)
         self.k = 0
 
     def x_omega(self):
@@ -29,14 +30,14 @@ class UKF:
                     L[i, k] = (1.0 / L[k, k] * (B[i, k] - t_sum))
         return L
 
-    def orientation_to_quat(self, w, dt=1):
+    def orientation_to_quat(self, w, dt=1.0):
         """ Convert 3D Orientation to 4D quat """
-        q = np.array([1, 0, 0, 0])
+        q = np.array([1.0, 0.0, 0.0, 0.0])
         if np.linalg.norm(w) != 0:
             angle = np.linalg.norm(w) * dt
-            axis = w / np.linalg.norm(w)
-            q[0] = math.cos(angle/2)
-            q[1:] = axis * math.sin(angle/2)
+            axis = w * 1.0/np.linalg.norm(w)
+            q[0] = np.cos(angle/2.)
+            q[1:] = axis * np.sin(angle/2.)
         return q
 
     def calc_sigma_pts(self):
@@ -46,7 +47,7 @@ class UKF:
         S = self.cholesky(self.P + self.Q)
         W_plus = math.sqrt(2*n) * S
         W_minus = -1.0 * math.sqrt(2*n) * S
-        W = np.hstack(W_plus, W_minus)
+        W = np.hstack((W_plus, W_minus))
     
         #Create X 
         q = self.x_quat()
@@ -65,8 +66,8 @@ class UKF:
         return X
     
     def quat_to_rotation_vector(self, q):
-        angle = math.acos(q[0]) * 2
-        axis = q[1:] / math.sin(angle/2)
+        angle = math.acos(q[0]) * 2.0
+        axis = q[1:] / math.sin(angle/2.0)
         r = axis * angle
         return r
 
@@ -81,13 +82,14 @@ class UKF:
             q_y = Y[:4, i]
             omega_y = Y[4:, i]
             omega_wprime = omega_y - omega_yhat
+            pdb.set_trace()
+
             #Eq 67
             r_wprime = self.quat_to_rotation_vector(quat_mult(q_y, quat_inv(q_yhat)))
-
             W_prime[0:3, i] = r_wprime #4D back to 3D
             W_prime[3:, i] = omega_wprime
 
-        P = (W_prime @ W_prime.T) * 1/(2*n)
+        P = (W_prime @ W_prime.T) * 1./(2.*n)
         return P, W_prime
 
     def process_update(self, dt):
@@ -95,19 +97,21 @@ class UKF:
         m = X.shape[1]
 
         #1) Construct Y by stepping X forward
-        Y = np.zeros((X.shape))
+        Y = np.zeros((X.shape), dtype=np.float64)
 
         #a) Update Quaternion portion of each Column in X
         for i in range(m):
             q = X[0:4, i]
             omega = X[4:, i]
-            d_q = self.orientation_to_quat(X[0:4, i], dt=dt)
+            d_q = self.orientation_to_quat(X[4:, i], dt=dt)
+
+            # pdb.set_trace() #DIFF
 
             Y[0:4, i] = quat_mult(q, d_q)
             Y[4:, i] = omega
 
         #2) Retrieve Mean and Covariance from Y
-        y_hat = np.zeros(7)
+        y_hat = np.zeros(7, dtype=np.float64)
         mean_q = quat_avg(Y[0:4, :])
         mean_omega = np.mean(Y[4:, :], axis=1)
 
@@ -118,6 +122,10 @@ class UKF:
         #3) Update the state and covariance matrices
         self.x = y_hat
         self.P = P_y
+    
+    def measurement_update(self, imu_data):
+        """ imu_data: [Ax, Ay, Az, X"""
+
 
 def unit_test():
     ukf = UKF()
@@ -137,5 +145,10 @@ def unit_test():
     print(L_true)
     print(f"Error:{np.linalg.norm(L_true - L_est)}")
     print("---"*12)
+
+    print("-------Testing Process Update ---------")
+    ukf.process_update(0.1)
+    print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
+    print("COV:\n", ukf.P, "\nSUM:", np.sum(ukf.P))
 
 unit_test()

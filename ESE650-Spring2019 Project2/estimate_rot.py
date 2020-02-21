@@ -109,7 +109,6 @@ def process_imu(imu_raw):
 	delta_e = np.zeros_like(omega)
 	delta_e[:, 0] = 0
 
-	pdb.set_trace()
 
 	# # plt.plot(np.squeeze(ts), gyro[:, 0], label="gyrosmthn")
 

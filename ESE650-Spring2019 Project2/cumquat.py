@@ -11,7 +11,7 @@ def euler_angles(q):
 
     
 def normalize(q):
-    q = 1/np.linalg.norm(q) * q
+    q = q * (1/np.linalg.norm(q))
     return q
 
 def from_rotm(R, q):
@@ -31,7 +31,7 @@ def quat_mult(q1, q2):
         w1*x2 + x1*w2 + y2*z1 - z2*y1,
         w1*y2 - x1*z2 + y1*w2 + z1*x2,
         w1*z2 + x1*y2 - y1*x2 + z1*w2
-    ])
+    ], dtype=np.float64)
     return q
 
 def quat_inv(q):
@@ -85,7 +85,9 @@ def unit_tests():
 
     qavg_true = meanr.as_quat()
     qavg_est = quat_avg(Q)
-    print(f"Error:{np.linalg.norm(-1.0*qavg_true - qavg_est)}")
+    print(f"qavg_true:{qavg_true}")
+    print(f"qavg_est:{qavg_est}")
+    print(f"Error:{np.linalg.norm(qavg_true - qavg_est)}")
 
 
     print("-----------Testing Inverse Quaternion")
