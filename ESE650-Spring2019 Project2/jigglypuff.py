@@ -71,6 +71,9 @@ class UKF:
         r = axis * angle
         return r
 
+    def get_q_omega(self, y):
+        return y[:4], y[4:]
+
     def compute_covariance(self, Y, y_hat):
         m = Y.shape[1]
         n = 6
@@ -82,9 +85,8 @@ class UKF:
             q_y = Y[:4, i]
             omega_y = Y[4:, i]
             omega_wprime = omega_y - omega_yhat
-            pdb.set_trace()
 
-            #Eq 67
+            #Eq 67 #FLIPPED SIGNS?
             r_wprime = self.quat_to_rotation_vector(quat_mult(q_y, quat_inv(q_yhat)))
             W_prime[0:3, i] = r_wprime #4D back to 3D
             W_prime[3:, i] = omega_wprime
@@ -99,7 +101,7 @@ class UKF:
         #1) Construct Y by stepping X forward
         Y = np.zeros((X.shape), dtype=np.float64)
 
-        #a) Update Quaternion portion of each Column in X
+        #a) Update Quaternion portion of each Column in X (X->Y)
         for i in range(m):
             q = X[0:4, i]
             omega = X[4:, i]
@@ -122,9 +124,32 @@ class UKF:
         #3) Update the state and covariance matrices
         self.x = y_hat
         self.P = P_y
+        return W_prime, Y
     
-    def measurement_update(self, imu_data):
-        """ imu_data: [Ax, Ay, Az, X"""
+    def _H2(self, q_y):
+        g = [0, 0, 0, 1]
+        inv_q_y = quat_inv(q_y)
+        g_prime = quat_mult(quat_mult(q_y, g), inv_q_y) #Eq 27
+        return g_prime
+
+    def _H1(self, omega_y):
+        return omega_y
+
+    def measurement_update(self, imu_data, W_prime, Y):
+        """ imu_data: [Ax, Ay, Az, Wx, Wy, Wz]
+            W_prime: 6 x 2n Matrix (See Diagram)
+            Y: 7 x 2n Matrix (See Diagram)
+        """
+        #1) Project Y -> Z => P(Z|X=x)
+        #This is what we 'expect' sensor readings to look like given our state est
+        Z = np.zeros((3, m))
+        n, m = W_prime.shape
+        for i in range(m):
+            q_y, omega_y = self.get_q_omega(Y[:, i])
+
+            #a) Apply H1 & H2 (Eq 24, 29)
+            z_rot = self._H1(omega_y)
+            z_acc = self._H2(q_y)
 
 
 def unit_test():
@@ -149,6 +174,6 @@ def unit_test():
     print("-------Testing Process Update ---------")
     ukf.process_update(0.1)
     print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
-    print("COV:\n", ukf.P, "\nSUM:", np.sum(ukf.P))
+    print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
 
 unit_test()
