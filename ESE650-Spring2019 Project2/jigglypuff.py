@@ -55,7 +55,7 @@ class UKF:
         X = np.empty((7, m))
         for i in range(m):
             #Eq 34
-            w_q = self.orientation_to_quat(W[:3, i]) #convert 3D to 2D
+            w_q = self.orientation_to_quat(W[:3, i]) #convert 3D to 4D
             w_omega = W[3:, i] 
             new_q = quat_mult(q, w_q)
             new_omega = omega + w_omega
@@ -63,13 +63,39 @@ class UKF:
             X[0:4, i] = new_q
             X[4:, i] = new_omega
         return X
+    
+    def quat_to_rotation_vector(self, q):
+        angle = math.acos(q[0]) * 2
+        axis = q[1:] / math.sin(angle/2)
+        r = axis * angle
+        return r
+
+    def compute_covariance(self, Y, y_hat):
+        m = Y.shape[1]
+        n = 6
+        W_prime = np.zeros((n, m))
+        q_yhat = y_hat[:4]
+        omega_yhat = y_hat[4:]
+
+        for i in range(m):
+            q_y = Y[:4, i]
+            omega_y = Y[4:, i]
+            omega_wprime = omega_y - omega_yhat
+            #Eq 67
+            r_wprime = self.quat_to_rotation_vector(quat_mult(q_y, quat_inv(q_yhat)))
+
+            W_prime[0:3, i] = r_wprime #4D back to 3D
+            W_prime[3:, i] = omega_wprime
+
+        P = (W_prime @ W_prime.T) * 1/(2*n)
+        return P, W_prime
 
     def process_update(self, dt):
         X = self.calc_sigma_pts()
         m = X.shape[1]
 
         #1) Construct Y by stepping X forward
-        Y = np.zeros_like(X)
+        Y = np.zeros((X.shape))
 
         #a) Update Quaternion portion of each Column in X
         for i in range(m):
@@ -80,9 +106,18 @@ class UKF:
             Y[0:4, i] = quat_mult(q, d_q)
             Y[4:, i] = omega
 
-        #2) Recompute Mean and Covariance from Y
+        #2) Retrieve Mean and Covariance from Y
+        y_hat = np.zeros(7)
         mean_q = quat_avg(Y[0:4, :])
-        
+        mean_omega = np.mean(Y[4:, :], axis=1)
+
+        y_hat[0:4] = mean_q
+        y_hat[4:] = mean_omega
+        P_y, W_prime = self.compute_covariance(Y, y_hat)
+
+        #3) Update the state and covariance matrices
+        self.x = y_hat
+        self.P = P_y
 
 def unit_test():
     ukf = UKF()

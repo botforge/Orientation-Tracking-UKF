@@ -34,6 +34,12 @@ def quat_mult(q1, q2):
     ])
     return q
 
+def quat_inv(q):
+    inv_q = q*-1.0
+    inv_q[0] *= -1.0
+    inv_q /= np.linalg.norm(inv_q) ** 2
+    return inv_q
+
 def quat_avg(Q):
     """ Q: 4 x n matrix """ 
     w, v = np.linalg.eig(Q @ Q.T)
@@ -80,5 +86,11 @@ def unit_tests():
     qavg_true = meanr.as_quat()
     qavg_est = quat_avg(Q)
     print(f"Error:{np.linalg.norm(-1.0*qavg_true - qavg_est)}")
+
+
+    print("-----------Testing Inverse Quaternion")
+    q = np.array([1, 0, 1, 0])
+    print(quat_inv(q))
+    print(quat_mult(q, quat_inv(q)))
     
 unit_tests()
