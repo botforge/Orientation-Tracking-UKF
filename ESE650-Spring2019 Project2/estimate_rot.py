@@ -106,7 +106,9 @@ def process_imu(imu_raw, rpy=False, datanum=1):
     sens_gyro = 3.33
     scale_gyro = 3300/1023/sens_gyro
     gyro = gyro * scale_gyro
-    bias_gyro = np.mean(gyro[0:250], axis=0)
+    bias_gyro = np.mean(gyro[0:300], axis=0)
+    if datanum == 3:
+        bias_gyro = np.mean(gyro[0:250], axis=0)
     gyro = (gyro - bias_gyro) * (math.pi/180.0)
 
     # # if rpy:
@@ -123,14 +125,6 @@ def process_imu(imu_raw, rpy=False, datanum=1):
     return np.hstack((accel, gyro)), ts
 
 
-# def quat_euler_angles(q):
-#     r = math.atan2(2*(q[0]*q[1]+q[2]*q[3]), \
-# 	1 - 2*(q[1]**2 + q[2]**2))
-#     p = math.asin(2*(q[0]*q[2] - q[3]*q[1]))
-#     y = math.atan2(2*(q[0]*q[3]+q[1]*q[2]), \
-#     1 - 2*(q[2]**2 + q[3]**2))
-#     return r, p, y
-
 def euler_angles(q):
           r = math.atan2(2*(q[0]*q[1]+q[2]*q[3]), \
                   1 - 2*(q[1]**2 + q[2]**2))
@@ -138,7 +132,6 @@ def euler_angles(q):
           y = math.atan2(2*(q[0]*q[3]+q[1]*q[2]), \
                   1 - 2*(q[2]**2 + q[3]**2))
           return np.array([r, p, y])
-
 def estimate_rot(data_num=1, plot=False, use_vicon = False):
     if use_vicon:
         imu_raw, vicon_raw = load_data(data_num)
@@ -151,18 +144,18 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
     data_len = imu_data.shape[0]
     
     ukf = UKF()
-    # if data_num == 2:
-    #     ukf.P = 3000 * np.identity(6)
-    #     ukf.Q = 100 * np.identity(6)
-    #     ukf.R = 100 * np.identity(6)
-    # elif data_num == 1:
-    #     ukf.P = 2500 * np.identity(6)
-    #     ukf.Q = 100 * np.identity(6)
-    #     ukf.R = 100 * np.identity(6)
-    # elif data_num == 3:
-    #     ukf.P = 0.2 * np.identity(6)
-    #     ukf.Q = 8 * np.identity(6)
-    #     ukf.R = 8 * np.identity(6)
+    if data_num == 2:
+        ukf.P = 3000 * np.identity(6)
+        ukf.Q = 100 * np.identity(6)
+        ukf.R = 100 * np.identity(6)
+    elif data_num == 1:
+        ukf.P = 2500 * np.identity(6)
+        ukf.Q = 100 * np.identity(6)
+        ukf.R = 100 * np.identity(6)
+    elif data_num == 3:
+        ukf.P = 2500 * np.identity(6)
+        ukf.Q = 100 * np.identity(6)
+        ukf.R = 100 * np.identity(6)
     
     ukf_rolls = []
     ukf_pitch = []

@@ -1,3 +1,4 @@
+
 import numpy as np
 from cumquat import *
 import pdb
@@ -6,9 +7,9 @@ import math
 class UKF:
     def __init__(self):
         self.x = np.array([1.0, 0, 0, 0, 0, 0, 0], dtype=np.float64)
-        self.P = 1 * np.identity(6)
-        self.Q = 8 * np.identity(6)
-        self.R = 8 * np.identity(6)
+        self.P = 3000 * np.identity(6)
+        self.Q = 100 * np.identity(6)
+        self.R = 100 * np.identity(6)
 
     def x_omega(self):
         return self.x[4:]
@@ -127,9 +128,9 @@ class UKF:
         return W_prime, Y
     
     def _H2(self, q_y):
-        g = np.array([0, 0, 0, 1])
+        g = [0, 0, 0, 9.8]
         inv_q_y = quat_inv(q_y)
-        g_prime = quat_mult(quat_mult(inv_q_y, g), q_y) #Eq 27
+        g_prime = quat_mult(quat_mult(q_y, g), inv_q_y) #Eq 27
         return g_prime[1:]
 
     def _H1(self, omega_y):
