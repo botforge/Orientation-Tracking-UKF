@@ -8,6 +8,7 @@ class UKF:
         self.x = np.array([1.0, 0, 0, 0, 1, 1, 1], dtype=np.float64)
         self.P = np.identity(6)
         self.Q = np.identity(6)
+        self.R = np.identity(6)
         self.k = 0
 
     def x_omega(self):
@@ -130,7 +131,7 @@ class UKF:
         g = [0, 0, 0, 1]
         inv_q_y = quat_inv(q_y)
         g_prime = quat_mult(quat_mult(q_y, g), inv_q_y) #Eq 27
-        return g_prime
+        return g_prime[1:]
 
     def _H1(self, omega_y):
         return omega_y
@@ -140,10 +141,10 @@ class UKF:
             W_prime: 6 x 2n Matrix (See Diagram)
             Y: 7 x 2n Matrix (See Diagram)
         """
+        n, m = W_prime.shape
         #1) Project Y -> Z => P(Z|X=x)
         #This is what we 'expect' sensor readings to look like given our state est
-        Z = np.zeros((3, m))
-        n, m = W_prime.shape
+        Z = np.zeros((6, m))
         for i in range(m):
             q_y, omega_y = self.get_q_omega(Y[:, i])
 
@@ -151,6 +152,27 @@ class UKF:
             z_rot = self._H1(omega_y)
             z_acc = self._H2(q_y)
 
+            Z[:3, i] = z_acc
+            Z[3:, i] = z_rot
+        
+        #2) Calculate mean and covariance of Z, P_zz, P_vv, P_xz
+        mean_z = np.mean(Z, axis=1)
+        Z_minus_mean = (Z.T - mean_z).T
+        P_zz = (1./(2*n)) * (Z_minus_mean @ Z_minus_mean.T)
+        P_vv = P_zz + self.R
+        P_xz = W_prime @ Z_minus_mean.T
+
+        #3) Kalman Gain and State Update Equations
+        K = P_xz @ np.linalg.inv(P_vv)
+        imu_update_6d = K @ imu_data
+        imu_update_7d = np.zeros(7)
+        imu_update_7d[0:4] = self.orientation_to_quat(imu_update_6d[:3])
+        imu_update_7d[4:] = imu_update_6d[3:]
+        x_pos = self.x + imu_update_7d
+        P = self.P - K @ P_vv @ K.T
+
+        self.x = x_pos
+        self.P = P
 
 def unit_test():
     ukf = UKF()
@@ -172,8 +194,16 @@ def unit_test():
     print("---"*12)
 
     print("-------Testing Process Update ---------")
-    ukf.process_update(0.1)
+    W_prime, Y = ukf.process_update(0.1)
     print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
     print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
+
+
+    print("-------Testing Measurement Update ---------")
+    test_imu_data = np.array([1, 1, 1, 1, 1, 1], dtype=np.float64)
+    ukf.measurement_update(test_imu_data, W_prime, Y)
+    print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
+    print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
+
 
 unit_test()
