@@ -6,10 +6,9 @@ import math
 class UKF:
     def __init__(self):
         self.x = np.array([1.0, 0, 0, 0, 1, 1, 1], dtype=np.float64)
-        self.P = np.identity(6)
-        self.Q = np.identity(6)
-        self.R = np.identity(6)
-        self.k = 0
+        self.P = 5 * np.identity(6)
+        self.Q = 5 * np.identity(6)
+        self.R = 5 * np.identity(6)
 
     def x_omega(self):
         return self.x[4:]
@@ -108,10 +107,9 @@ class UKF:
             omega = X[4:, i]
             d_q = self.orientation_to_quat(X[4:, i], dt=dt)
 
-            # pdb.set_trace() #DIFF
-
             Y[0:4, i] = quat_mult(q, d_q)
             Y[4:, i] = omega
+
 
         #2) Retrieve Mean and Covariance from Y
         y_hat = np.zeros(7, dtype=np.float64)
@@ -125,6 +123,7 @@ class UKF:
         #3) Update the state and covariance matrices
         self.x = y_hat
         self.P = P_y
+
         return W_prime, Y
     
     def _H2(self, q_y):
@@ -148,28 +147,36 @@ class UKF:
         for i in range(m):
             q_y, omega_y = self.get_q_omega(Y[:, i])
 
+
             #a) Apply H1 & H2 (Eq 24, 29)
             z_rot = self._H1(omega_y)
             z_acc = self._H2(q_y)
 
             Z[:3, i] = z_acc
             Z[3:, i] = z_rot
-        
+
+
         #2) Calculate mean and covariance of Z, P_zz, P_vv, P_xz
         mean_z = np.mean(Z, axis=1)
         Z_minus_mean = (Z.T - mean_z).T
-        P_zz = (1./(2*n)) * (Z_minus_mean @ Z_minus_mean.T)
+        P_zz = (1./(2.*n)) * (Z_minus_mean @ Z_minus_mean.T)
         P_vv = P_zz + self.R
-        P_xz = W_prime @ Z_minus_mean.T
+        P_xz = (1./(2.*n)) * (W_prime @ Z_minus_mean.T)
+
 
         #3) Kalman Gain and State Update Equations
         K = P_xz @ np.linalg.inv(P_vv)
-        imu_update_6d = K @ imu_data
+        v = imu_data - mean_z
+        imu_update_6d = K @ v
         imu_update_7d = np.zeros(7)
         imu_update_7d[0:4] = self.orientation_to_quat(imu_update_6d[:3])
         imu_update_7d[4:] = imu_update_6d[3:]
-        x_pos = self.x + imu_update_7d
-        P = self.P - K @ P_vv @ K.T
+
+        #a) Compose new quaternion
+        x_pos = np.zeros(7)
+        x_pos[:4] = quat_mult(self.x_quat(), imu_update_7d[:4])
+        x_pos[4:] = self.x_omega() + imu_update_7d[4:]
+        P = self.P - (K @ P_vv @ K.T)
 
         self.x = x_pos
         self.P = P
@@ -196,8 +203,9 @@ def unit_test():
     print("-------Testing Process Update ---------")
     W_prime, Y = ukf.process_update(0.1)
     print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
-    print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
+    print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P), "\nSUM:", np.sum(ukf.P))
 
+    #SAME SO FAR!
 
     print("-------Testing Measurement Update ---------")
     test_imu_data = np.array([1, 1, 1, 1, 1, 1], dtype=np.float64)
@@ -205,5 +213,12 @@ def unit_test():
     print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
     print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
 
-
+    
+    print("------Sanity Testing Several Process + Measurement Updates")
+    ukfnew = UKF()
+    test_imu_data = np.random.rand(6)
+    for i in range(10):
+        # W_prime, Y = ukfnew.process_update(0.01)
+        # ukfnew.measurement_update(test_imu_data, W_prime, Y)
+        print("i:", i, ", TRACE COV:", np.trace(ukfnew.P))
 unit_test()
