@@ -36,7 +36,7 @@ def quat_mult(q0, q1):
 def quat_inv(q):
     inv_q = q*-1.0
     inv_q[0] *= -1.0
-    inv_q /= np.linalg.norm(inv_q) ** 2
+    inv_q /= np.linalg.norm(inv_q)**2
     return inv_q
 
 def quat_avg(Q):

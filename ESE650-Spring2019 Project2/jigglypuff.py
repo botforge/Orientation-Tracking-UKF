@@ -127,9 +127,9 @@ class UKF:
         return W_prime, Y
     
     def _H2(self, q_y):
-        g = [0, 0, 0, 9.8]
+        g = np.array([0, 0, 0, 1])
         inv_q_y = quat_inv(q_y)
-        g_prime = quat_mult(quat_mult(q_y, g), inv_q_y) #Eq 27
+        g_prime = quat_mult(quat_mult(inv_q_y, g), q_y) #Eq 27
         return g_prime[1:]
 
     def _H1(self, omega_y):

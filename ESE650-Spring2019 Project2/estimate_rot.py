@@ -54,12 +54,12 @@ def vicon_to_euler(vicon_raw):
         yaws.append(yaw)
     return rolls, pitches, yaws
 
-def plot_vicon(vicon_raw):
+def plot_vicon(vicon_raw, ax):
     rolls, pitches, yaws = vicon_to_euler(vicon_raw)
     ts = vicon_raw.get("ts")
-    plt.plot(np.squeeze(ts), rolls, label="roll")
-    # plt.plot(np.squeeze(ts), pitches, label="pitch")
-    # plt.plot(np.squeeze(ts), yaws, label="yaw")
+    ax[0].plot(np.squeeze(ts), rolls, label="roll")
+    ax[1].plot(np.squeeze(ts), pitches, label="pitch")
+    ax[2].plot(np.squeeze(ts), yaws, label="yaw")
 
 def process_imu(imu_raw, rpy=False, datanum=1):
     """
@@ -106,7 +106,7 @@ def process_imu(imu_raw, rpy=False, datanum=1):
     sens_gyro = 3.33
     scale_gyro = 3300/1023/sens_gyro
     gyro = gyro * scale_gyro
-    bias_gyro = np.mean(gyro[0:10], axis=0)
+    bias_gyro = np.mean(gyro[0:250], axis=0)
     gyro = (gyro - bias_gyro) * (math.pi/180.0)
 
     # # if rpy:
@@ -145,23 +145,24 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
     else:
         imu_raw = load_imu_data(data_num)
     if plot:
-        plot_vicon(vicon_raw)
+        fig, axes = plt.subplots(nrows=3, ncols=1)
+        plot_vicon(vicon_raw, axes)
     imu_data, ts = process_imu(imu_raw, rpy=False, datanum = data_num)
     data_len = imu_data.shape[0]
-
+    
     ukf = UKF()
-    if data_num == 2:
-        ukf.P = 3000 * np.identity(6)
-        ukf.Q = 100 * np.identity(6)
-        ukf.R = 100 * np.identity(6)
-    elif data_num == 1:
-        ukf.P = 2500 * np.identity(6)
-        ukf.Q = 100 * np.identity(6)
-        ukf.R = 100 * np.identity(6)
-    elif data_num == 3:
-        ukf.P = 0.2 * np.identity(6)
-        ukf.Q = 8 * np.identity(6)
-        ukf.R = 8 * np.identity(6)
+    # if data_num == 2:
+    #     ukf.P = 3000 * np.identity(6)
+    #     ukf.Q = 100 * np.identity(6)
+    #     ukf.R = 100 * np.identity(6)
+    # elif data_num == 1:
+    #     ukf.P = 2500 * np.identity(6)
+    #     ukf.Q = 100 * np.identity(6)
+    #     ukf.R = 100 * np.identity(6)
+    # elif data_num == 3:
+    #     ukf.P = 0.2 * np.identity(6)
+    #     ukf.Q = 8 * np.identity(6)
+    #     ukf.R = 8 * np.identity(6)
     
     ukf_rolls = []
     ukf_pitch = []
@@ -176,16 +177,18 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
         ukf_yaw.append(y)
 
     if plot:
-        plt.plot(np.squeeze(ts)[:-1], ukf_rolls, label="ukf_rolls")
-        # plt.plot(np.squeeze(ts)[:-1], ukf_pitch, label="ukf_pitch")
-        # plt.plot(np.squeeze(ts)[:-1], ukf_yaw, label="ukf_yaw")
-        plt.legend()
+        axes[0].plot(np.squeeze(ts)[:-1], ukf_rolls, label="ukf_rolls")
+        axes[0].legend()
+        axes[1].plot(np.squeeze(ts)[:-1], ukf_pitch, label="ukf_pitch")
+        axes[1].legend()
+        axes[2].plot(np.squeeze(ts)[:-1], ukf_yaw, label="ukf_yaw")
+        axes[2].legend()
         plt.show()
     
     return np.array(ukf_rolls), np.array(ukf_pitch), np.array(ukf_yaw)
 
-# data_num=3
-# start = time.time()
-# estimate_rot(data_num, plot=True, use_vicon=True)
-# end = time.time()
-# print("done, ", end-start)
+data_num=3
+start = time.time()
+estimate_rot(data_num, plot=True, use_vicon=True)
+end = time.time()
+print("done, ", end-start)
