@@ -6,9 +6,9 @@ import math
 class UKF:
     def __init__(self):
         self.x = np.array([1.0, 0, 0, 0, 0, 0, 0], dtype=np.float64)
-        self.P = 3000 * np.identity(6)
-        self.Q = 100 * np.identity(6)
-        self.R = 100 * np.identity(6)
+        self.P = 1 * np.identity(6)
+        self.Q = 8 * np.identity(6)
+        self.R = 8 * np.identity(6)
 
     def x_omega(self):
         return self.x[4:]
@@ -127,7 +127,7 @@ class UKF:
         return W_prime, Y
     
     def _H2(self, q_y):
-        g = [0, 0, 0, 1]
+        g = [0, 0, 0, 9.8]
         inv_q_y = quat_inv(q_y)
         g_prime = quat_mult(quat_mult(q_y, g), inv_q_y) #Eq 27
         return g_prime[1:]
@@ -181,44 +181,44 @@ class UKF:
         self.x = x_pos
         self.P = P
 
-def unit_test():
-    ukf = UKF()
+# def unit_test():
+#     ukf = UKF()
 
-    print("------Testing Cholesky-----------")
-    A = np.array([[6, 3, 4, 8], [3, 6, 5, 1], [4, 5, 10, 7], [8, 1, 7, 25]])
-    L_est = ukf.cholesky(A)
-    L_true = np.array([[2.449489742783178, 0.0, 0.0, 0.0],
- [1.2247448713915892, 2.1213203435596424, 0.0, 0.0],
- [1.6329931618554523, 1.414213562373095, 2.309401076758503, 0.0],
- [3.2659863237109046,
-  -1.4142135623730956,
-  1.5877132402714704,
-  3.1324910215354165]])
+#     print("------Testing Cholesky-----------")
+#     A = np.array([[6, 3, 4, 8], [3, 6, 5, 1], [4, 5, 10, 7], [8, 1, 7, 25]])
+#     L_est = ukf.cholesky(A)
+#     L_true = np.array([[2.449489742783178, 0.0, 0.0, 0.0],
+#  [1.2247448713915892, 2.1213203435596424, 0.0, 0.0],
+#  [1.6329931618554523, 1.414213562373095, 2.309401076758503, 0.0],
+#  [3.2659863237109046,
+#   -1.4142135623730956,
+#   1.5877132402714704,
+#   3.1324910215354165]])
 
-    print(L_est)
-    print(L_true)
-    print(f"Error:{np.linalg.norm(L_true - L_est)}")
-    print("---"*12)
+#     print(L_est)
+#     print(L_true)
+#     print(f"Error:{np.linalg.norm(L_true - L_est)}")
+#     print("---"*12)
 
-    print("-------Testing Process Update ---------")
-    W_prime, Y = ukf.process_update(0.1)
-    print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
-    print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P), "\nSUM:", np.sum(ukf.P))
+#     print("-------Testing Process Update ---------")
+#     W_prime, Y = ukf.process_update(0.1)
+#     print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
+#     print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P), "\nSUM:", np.sum(ukf.P))
 
-    #SAME SO FAR!
+#     #SAME SO FAR!
 
-    print("-------Testing Measurement Update ---------")
-    test_imu_data = np.array([1, 1, 1, 1, 1, 1], dtype=np.float64)
-    ukf.measurement_update(test_imu_data, W_prime, Y)
-    print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
-    print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
+#     print("-------Testing Measurement Update ---------")
+#     test_imu_data = np.array([1, 1, 1, 1, 1, 1], dtype=np.float64)
+#     ukf.measurement_update(test_imu_data, W_prime, Y)
+#     print("MEAN:", ukf.x, "\nSUM:", np.sum(ukf.x))
+#     print("COV:\n", ukf.P, "\nTRACE:", np.trace(ukf.P))
 
     
-    print("------Sanity Testing Several Process + Measurement Updates")
-    ukfnew = UKF()
-    test_imu_data = np.random.rand(6)
-    for i in range(10):
-        # W_prime, Y = ukfnew.process_update(0.01)
-        # ukfnew.measurement_update(test_imu_data, W_prime, Y)
-        print("i:", i, ", TRACE COV:", np.trace(ukfnew.P))
-unit_test()
+#     print("------Sanity Testing Several Process + Measurement Updates")
+#     ukfnew = UKF()
+#     test_imu_data = np.random.rand(6)
+#     for i in range(10):
+#         # W_prime, Y = ukfnew.process_update(0.01)
+#         # ukfnew.measurement_update(test_imu_data, W_prime, Y)
+#         print("i:", i, ", TRACE COV:", np.trace(ukfnew.P))
+# unit_test()
