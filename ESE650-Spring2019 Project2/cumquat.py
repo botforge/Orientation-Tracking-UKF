@@ -39,11 +39,59 @@ def quat_inv(q):
     inv_q /= np.linalg.norm(inv_q)**2
     return inv_q
 
-def quat_avg(Q):
-    """ Q: 4 x n matrix """ 
-    w, v = np.linalg.eig(Q @ Q.T)
-    q = v[:, np.argmax(w)]
-    return normalize(q)
+# def quat_avg(Q):
+#     """ Q: 4 x n matrix """ 
+#     w, v = np.linalg.eig(Q @ Q.T)
+#     q = v[:, np.argmax(w)]
+#     return normalize(q)
+
+def quat_tovec(q1):
+    #warnings.filterwarnings("error")
+    if q1[0]==1:
+        return np.zeros((3,))
+    ans = np.zeros((3,))
+    theta = 2*np.arccos(q1[0])
+    ans = (theta/np.sin(theta/2))*q1[1:]
+    return ans
+
+def quat_vectoquat(v):
+    v/=2
+    norm = np.linalg.norm(v)
+    if norm == 0:
+        return np.array([1, 0, 0, 0], dtype=np.float64)
+    q = np.zeros((4, ))
+    q[0] = np.cos(norm)
+    q[1:] = (v/norm) * np.sin(norm)
+    return q
+
+def quat_avg(Q, q0):
+    """
+    Q: 4 x 2n Matrix of Quats
+    q0: Initial state (generally quaternion representation of previous state)
+    """
+    m = Q.shape[1] #m=2n
+    max_iters = 100
+    eps = 1e-2
+    q_prev = normalize(q0)
+    e_vecs = np.zeros((3, m))
+    e_qs = np.zeros((4, m))
+
+    for t in range(max_iters):
+        for i in range(m):
+            q = normalize(Q[:, i])
+            e_i = normalize(quat_mult(q, quat_inv(q_prev)))
+            e_v = quat_tovec(e_i)
+            if np.linalg.norm(e_v) == 0:
+                e_vecs[:, i] = np.zeros((3, ))
+            else:
+                e_vecs[:, i] = (-np.pi + np.remainder(np.linalg.norm(e_v)+np.pi,2*np.pi))/np.linalg.norm(e_v)*e_v 
+        ei_avg = np.mean(e_vecs, axis=1)
+        q_prev = normalize(quat_mult(quat_vectoquat(ei_avg), q_prev)) 
+
+        if np.linalg.norm(ei_avg) < 0.01:
+            break
+    return q_prev, e_vecs
+
 
 def build_quat(w, x, y, z):
     return np.array([w, x, y, z])
@@ -88,7 +136,8 @@ def unit_tests():
                     [0, 0, np.sin(np.pi / 16), np.cos(np.pi / 16)]]).T
 
     qavg_true = meanr.as_quat()
-    qavg_est = quat_avg(Q)
+    # qavg_est = quat_avg(Q)
+    qavg_est = np.ones(4)
     print(f"qavg_true:{qavg_true}")
     print(f"qavg_est:{qavg_est}")
     print(f"Error:{np.linalg.norm(qavg_true - qavg_est)}")

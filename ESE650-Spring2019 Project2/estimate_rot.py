@@ -52,8 +52,7 @@ def vicon_to_euler(vicon_raw):
         rolls.append(roll)
         pitches.append(pitch)
         yaws.append(yaw)
-    return rolls, pitches, yaws
-
+    return rolls, pitches, yaws 
 def plot_vicon(vicon_raw, ax):
     rolls, pitches, yaws = vicon_to_euler(vicon_raw)
     ts = vicon_raw.get("ts")
@@ -106,23 +105,13 @@ def process_imu(imu_raw, rpy=False, datanum=1):
     sens_gyro = 3.33
     scale_gyro = 3300/1023/sens_gyro
     gyro = gyro * scale_gyro
+    # bias_gyro = gyro[0]
     bias_gyro = np.mean(gyro[0:300], axis=0)
     if datanum == 3:
         bias_gyro = np.mean(gyro[0:250], axis=0)
     gyro = (gyro - bias_gyro) * (math.pi/180.0)
 
-    # # if rpy:
-    #     #3) Convert [Rx, Ry, Rz] into roll, pitch, yaw (roll & pitch from accel are swapped w.r.t vicon)
-    #     #a) Accelerometer
-    #     accel_pitch = np.arctan2(-accel[:, 0], accel[:, 2])
-    #     accel_roll = np.arctan2(accel[:, 1], (np.sqrt(np.square(accel[:, 0]) + np.square(accel[:, 2]))))
-    #     plt.plot(ts, accel_pitch, label="accel_pitch")
-    #     plt.plot(ts, accel_roll, label="accel_roll")
-
-    #     #b) Gyroscope
-    #     omega = gyro
-    
-    return np.hstack((accel, gyro)), ts
+    return accel, gyro, ts
 
 
 def euler_angles(q):
@@ -140,7 +129,8 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
     if plot:
         fig, axes = plt.subplots(nrows=3, ncols=1)
         plot_vicon(vicon_raw, axes)
-    imu_data, ts = process_imu(imu_raw, rpy=False, datanum = data_num)
+    accel, gyro, ts = process_imu(imu_raw, rpy=False, datanum = data_num)
+    imu_data = np.hstack((accel, gyro))
     data_len = imu_data.shape[0]
     
     ukf = UKF()
@@ -153,9 +143,9 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
         ukf.Q = 100 * np.identity(6)
         ukf.R = 100 * np.identity(6)
     elif data_num == 3:
-        ukf.P = 2500 * np.identity(6)
-        ukf.Q = 100 * np.identity(6)
-        ukf.R = 100 * np.identity(6)
+        ukf.P = 1 * np.identity(6)
+        ukf.Q = 8 * np.identity(6)
+        ukf.R = 8 * np.identity(6)
     
     ukf_rolls = []
     ukf_pitch = []
@@ -169,6 +159,11 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
         ukf_rolls.append(r)
         ukf_yaw.append(y)
 
+    #3) Convert [Rx, Ry, Rz] into roll, pitch, yaw (roll & pitch from accel are swapped w.r.t vicon)
+    #a) Accelerometer
+    # ukf_pitch = np.arctan2(-accel[:, 0], accel[:, 2])[:-1]
+    # ukf_rolls = np.arctan2(accel[:, 1], (np.sqrt(np.square(accel[:, 0]) + np.square(accel[:, 2]))))[:-1]
+
     if plot:
         axes[0].plot(np.squeeze(ts)[:-1], ukf_rolls, label="ukf_rolls")
         axes[0].legend()
@@ -177,10 +172,10 @@ def estimate_rot(data_num=1, plot=False, use_vicon = False):
         axes[2].plot(np.squeeze(ts)[:-1], ukf_yaw, label="ukf_yaw")
         axes[2].legend()
         plt.show()
-    
+
     return np.array(ukf_rolls), np.array(ukf_pitch), np.array(ukf_yaw)
 
-data_num=3
+data_num=1
 start = time.time()
 estimate_rot(data_num, plot=True, use_vicon=True)
 end = time.time()

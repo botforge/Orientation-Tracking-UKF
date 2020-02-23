@@ -7,9 +7,9 @@ import math
 class UKF:
     def __init__(self):
         self.x = np.array([1.0, 0, 0, 0, 0, 0, 0], dtype=np.float64)
-        self.P = 3000 * np.identity(6)
-        self.Q = 100 * np.identity(6)
-        self.R = 100 * np.identity(6)
+        self.P = 1 * np.identity(6)
+        self.Q = 8 * np.identity(6)
+        self.R = 8 * np.identity(6)
 
     def x_omega(self):
         return self.x[4:]
@@ -75,7 +75,7 @@ class UKF:
     def get_q_omega(self, y):
         return y[:4], y[4:]
 
-    def compute_covariance(self, Y, y_hat):
+    def compute_covariance(self, r_Wprime):
         m = Y.shape[1]
         n = 6
         W_prime = np.zeros((n, m))
@@ -113,13 +113,23 @@ class UKF:
 
 
         #2) Retrieve Mean and Covariance from Y
+        m = Y.shape[1]
+        n = 6
+        W_prime = np.zeros((n, m))
+
         y_hat = np.zeros(7, dtype=np.float64)
-        mean_q = quat_avg(Y[:4, :])
+        mean_q, r_W_prime = quat_avg(Y[:4, :], self.x[:4])
         mean_omega = np.mean(Y[4:, :], axis=1)
+
 
         y_hat[:4] = mean_q
         y_hat[4:] = mean_omega
-        P_y, W_prime = self.compute_covariance(Y, y_hat)
+
+        omega_W_prime = (Y[4:, :].T - mean_omega).T
+        W_prime[:3, :] = r_W_prime
+        W_prime[3:, :] = omega_W_prime
+        P_y = (W_prime @ W_prime.T) * (1./(2.*n))
+        # P_y, W_prime = self.compute_covariance(Y, y_hat)
 
         #3) Update the state and covariance matrices
         self.x = y_hat
